@@ -1,3 +1,3 @@
-Using glew instead of gl3w.
+Play streaming video in a Imgui based UI
 
-PLUS: a very simple cmake file for linux only, and probably won't work without modification for anyone else. Anyway, I find it useful.
+[[https://github.com/ddewert/imgui-video-player/blob/master/demo.png|alt=octocat]]
