@@ -7,7 +7,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include "video_player.h"
+#include "video_player.hpp"
 #define DEFAULT_URL "http://192.168.43.1:8080/video"
 
 #define IM_ARRAYSIZE(_ARR)  ((int)(sizeof(_ARR)/sizeof(*_ARR)))
@@ -65,7 +65,7 @@ int main(int, char**)
     GLuint tex;
     glGenTextures(1, &tex);
 
-    GL3VideoPlayer video1{640,480,gl_window_ctx};
+    GL3VideoPlayer<GL3FrameRenderer_Texture2D> video1{640,480,gl_window_ctx};
     // GL3VideoPlayer video2{640,480,gl_window_ctx};
     std::future<int> open_video;
     std::future<int> render_frame;

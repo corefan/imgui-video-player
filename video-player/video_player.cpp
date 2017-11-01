@@ -1,8 +1,11 @@
-#include "video_player.h"
+// #include "video_player.h"
 
 // static members
-std::set<std::string> GL3VideoPlayer::open_urls = {};
-bool GL3VideoPlayer::_init = false;
+template<class T>
+std::set<std::string> GL3VideoPlayer<T>::open_urls = {};
+
+template<class T>
+bool GL3VideoPlayer<T>::_init = false;
 /* TODO
 int GL3VideoPlayer::CloseStream()
 {
@@ -14,7 +17,8 @@ int GL3VideoPlayer::CloseStream()
 
    TODO: cover the situation where this function is called while a video is being played
 */
-int GL3VideoPlayer::i_OpenStream(std::string url)
+template<class Renderer>
+int GL3VideoPlayer<Renderer>::i_OpenStream(std::string url)
 {
   if ( !open_urls.empty()  )
   {
@@ -137,7 +141,8 @@ int GL3VideoPlayer::i_OpenStream(std::string url)
   return 1;
 }
 
-int GL3VideoPlayer::i_RenderFrame(TimeSegment* tf)
+template<class Renderer>
+int GL3VideoPlayer<Renderer>::i_RenderFrame(TimeSegment* tf)
 {
   int val = 0;
   if (tf != nullptr) tf->Start();
@@ -147,8 +152,8 @@ int GL3VideoPlayer::i_RenderFrame(TimeSegment* tf)
   if ( _rgb_frame_q.size_approx() > 1) return val;
   if (_rgb_frame_q.try_dequeue(_next_frame))
   {
-    if (frame_count == 0) GL3FrameRenderer::RenderFrame0(&_next_frame);
-    else GL3FrameRenderer::RenderFrame(&_next_frame);
+    if (frame_count == 0) Renderer::RenderFrame_0(&_next_frame);
+    else Renderer::RenderFrame_1(&_next_frame);
     frame_count++;
     val = 1;
   }
@@ -156,14 +161,14 @@ int GL3VideoPlayer::i_RenderFrame(TimeSegment* tf)
   return val;
 }
 
-int GL3VideoPlayer::i_ReadFrame(TimeSegment* tf)
+template<class Renderer>
+int GL3VideoPlayer<Renderer>::i_ReadFrame(TimeSegment* tf)
 {
   if (! (_init && _stream_open )) return -1;
   static size_t frame_count = 0;
   if (tf != nullptr) tf->Start();
   if (av_read_frame(format_ctx, &packet) >= 0)
   {
-
     int frame_finished = 0;
     packet.stream_index = stream->id;
 
@@ -185,11 +190,7 @@ int GL3VideoPlayer::i_ReadFrame(TimeSegment* tf)
         _rgb_frame->linesize);
 
       _rgb_frame_q.try_enqueue(*_rgb_frame);
-
-      // if (frame_count == 0) GL3FrameRenderer::RenderFrame0(_rgb_frame);
-      // else GL3FrameRenderer::RenderFrame(_rgb_frame);
     }
-    // if (frame_finished) GL3FrameRenderer::RenderFrame(_rgb_frame);
     frame_count++;
     av_free_packet(&packet);
     av_init_packet(&packet);
@@ -198,22 +199,15 @@ int GL3VideoPlayer::i_ReadFrame(TimeSegment* tf)
   return frame_count;
 }
 
-void GL3FrameRenderer::RenderFrame0(AVFrame* frame)
-{
-  glBindTexture(GL_TEXTURE_2D, tex);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width,height,0,GL_RED,GL_UNSIGNED_BYTE, frame->data[0]);
-}
-
-
-void GL3FrameRenderer::RenderFrame(AVFrame* frame)
+void GL3FrameRenderer_Texture2D::RenderFrame_1(AVFrame* frame)
 {
   glActiveTexture(tex);
   glBindTexture(GL_TEXTURE_2D, tex);
   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RED, GL_UNSIGNED_BYTE, frame->data[0]);
-
 }
 
-void GL3FrameRenderer::InitTexture()
+void GL3FrameRenderer_Texture2D::RenderFrame_0(AVFrame* frame)
 {
-
+  glBindTexture(GL_TEXTURE_2D, tex);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width,height,0,GL_RED,GL_UNSIGNED_BYTE, frame->data[0]);
 }

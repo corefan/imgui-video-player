@@ -36,12 +36,12 @@ set( source_files
 
 LINK_DIRECTORIES(${GLFW_LIBRARY_DIR})
 
-add_subdirectory( "${PROJECT_SOURCE_DIR}/video-player" )
+# add_subdirectory( "${PROJECT_SOURCE_DIR}/video-player" )
 
 add_executable( app ${source_files})
 
 target_link_libraries( app
-  videoPlayer
+  # videoPlayer
   pthread
   ${FFMPEG_LIBAVCODEC}
   ${FFMPEG_LIBAVFORMAT}

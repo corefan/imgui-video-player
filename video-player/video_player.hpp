@@ -37,14 +37,13 @@ struct TimeSegment
   TimeSegment() { t0 = Clock::now(); t1 = t0; }
 };
 
-class GL3FrameRenderer
+class GL3FrameRenderer_Texture2D
 {
 public:
-  void RenderFrame(AVFrame* frame);
-  void RenderFrame0(AVFrame* frame);
-  void InitTexture();
+  void RenderFrame_0(AVFrame* frame);
+  void RenderFrame_1(AVFrame* frame);
 
-  GL3FrameRenderer(const size_t w, const size_t h)
+  GL3FrameRenderer_Texture2D(const size_t w, const size_t h)
   : width{w}, height{h}
   {
     glGenTextures(1, &tex);
@@ -63,11 +62,12 @@ protected:
 };
 
 // TODO: don't use inheritance like this
-class GL3VideoPlayer : GL3FrameRenderer
+template<class Renderer>
+class GL3VideoPlayer : Renderer
 {
 public:
   GL3VideoPlayer(size_t w, size_t h,  GLFWwindow* window)
-  :  GL3FrameRenderer(w,h) , format_ctx{nullptr} ,
+  :  Renderer(w,h) , format_ctx{nullptr} ,
      codec_ctx{nullptr} ,
      _stream_open{false} ,
      video_stream_index{-1} ,
@@ -192,7 +192,7 @@ public:
 
   bool IsInited() { return _init; }
   bool StreamIsOpen() { return _stream_open; }
-  GLuint GetTextureId() { return GL3FrameRenderer::tex; }
+  GLuint GetTextureId() { return Renderer::tex; }
   const char* GetStatusString() { return status.c_str(); }
   AVFormatContext* format_ctx;
 
@@ -213,5 +213,7 @@ private:
   std::string status;
   static std::set<std::string> open_urls;
 };
+
+#include "video_player.cpp"
 
 #endif // _VIDEO_PLAYER_H_
