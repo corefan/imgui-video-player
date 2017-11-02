@@ -7,11 +7,13 @@
 #include <set>
 #include <SDL2/SDL.h>
 
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
 #include <libswscale/swscale.h>
+#include "feature/mser.h"
 }
 
 // GL frame renderer
@@ -21,6 +23,7 @@ extern "C" {
 #include "readerwriterqueue/atomicops.h"
 #include "readerwriterqueue/readerwriterqueue.h"
 
+#include "mser/mser.h"
 using namespace moodycamel;
 using Clock = std::chrono::steady_clock;
 using Interval = std::chrono::nanoseconds;
@@ -36,6 +39,18 @@ struct TimeSegment
   size_t Duration() { return std::chrono::duration_cast<Interval>(t1 - t0).count(); }
   TimeSegment() { t0 = Clock::now(); t1 = t0; }
 };
+
+bool do_mser_cpu(
+  mser_cpu_context& ctx,
+  const AVFrame& frame,
+  VlMserReg* regions )
+{
+  vl_mser_process(
+    ctx.MserFilt,
+    (vl_mser_pix const*)frame.data[0] );
+
+  return true;
+}
 
 class GL3FrameRenderer_Texture2D
 {
@@ -62,105 +77,13 @@ protected:
 };
 
 // TODO: don't use inheritance like this
+// unless you want to define some function that takes a Renderer as argument
 template<class Renderer>
 class GL3VideoPlayer : Renderer
 {
 public:
-  GL3VideoPlayer(size_t w, size_t h,  GLFWwindow* window)
-  :  Renderer(w,h) , format_ctx{nullptr} ,
-     codec_ctx{nullptr} ,
-     _stream_open{false} ,
-     video_stream_index{-1} ,
-     picture{nullptr} , picture_buffer{nullptr} ,
-     stream{nullptr} , output_ctx{nullptr} ,
-     codec{nullptr}
-  {
-    status = "Initialzing...";
-
-    if (! _init )
-    {
-      av_register_all();
-      avformat_network_init();
-      // av_log_set_level( AV_LOG_DEBUG );
-
-      format_ctx = avformat_alloc_context();
-      output_ctx = avformat_alloc_context();
-      if (format_ctx == nullptr || output_ctx == nullptr)
-      {
-        std::cout << "FFMpegStreamer: avformat_alloc_context failed" << std::endl;
-        return;
-      }
-
-      codec = avcodec_find_decoder(AV_CODEC_ID_MJPEG);
-      if (codec == nullptr)
-      {
-          std::cout << "FFMpegStreamer: could not find codec" << std::endl;
-          return;
-      }
-
-      codec_ctx = avcodec_alloc_context3(codec);
-      if (codec_ctx == nullptr)
-      {
-          std::cout << "FFMpegStreamer: could not allocate codec_ctx" << std::endl;
-          return;
-      }
-
-      if (avcodec_open2(codec_ctx, codec, nullptr) < 0)
-      {
-        std::cout << "avcodec_open2 failed" << std::endl;
-        return;
-      }
-
-      av_init_packet(&packet);
-
-      format_ctx = avformat_alloc_context();
-      if (format_ctx == nullptr )
-      {
-        std::cout << "avformat_alloc_context failed" << std::endl;
-        return;
-      }
-
-      picture = av_frame_alloc();
-      _rgb_frame = av_frame_alloc();
-      if (picture == nullptr || _rgb_frame == nullptr)
-      {
-        std::cout << "av_frame_alloc failed" << std::endl;
-        return;
-      }
-
-      _init = true;
-      status = "Initialized.";
-    }
-  }
-
-  ~GL3VideoPlayer()
-  {
-    if (StreamIsOpen())
-    {
-      av_read_pause(format_ctx);
-      avio_close(output_ctx->pb);
-    }
-
-    if ( _init )
-    {
-      avformat_network_deinit();
-    }
-
-    if (codec_ctx != nullptr)
-    {
-      avcodec_close( codec_ctx );
-      avcodec_free_context( &codec_ctx);
-      av_freep( &codec_ctx);
-    }
-
-    if (picture != nullptr) av_frame_unref(picture);
-    av_freep(&picture);
-    if (_rgb_frame != nullptr) av_frame_unref(_rgb_frame);
-    av_freep(&_rgb_frame);
-    if (picture_buffer != nullptr) av_free(picture_buffer);
-    if (output_ctx != nullptr) avformat_free_context(output_ctx);
-    if (format_ctx != nullptr) avformat_free_context(format_ctx);
-  }
+  GL3VideoPlayer(size_t w, size_t h,  GLFWwindow* window);
+  ~GL3VideoPlayer();
 
   std::future<int> t_OpenStream(std::string url)
   {
@@ -212,6 +135,11 @@ private:
   ReaderWriterQueue<AVFrame> _rgb_frame_q{3};
   std::string status;
   static std::set<std::string> open_urls;
+  size_t output_width;
+  size_t output_height;
+  size_t output_channels;
+  mser_cpu_context mser_ctx;
+
 };
 
 #include "video_player.cpp"

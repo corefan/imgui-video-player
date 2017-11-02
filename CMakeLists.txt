@@ -20,7 +20,7 @@ include_directories(
   .
    ${GLUT_INCLUDE_DIRS}
    ${GLEW_INCLUDE_DIRS}
-  "${PROJECT_SOURCE_DIR}/src"
+  "${PROJECT_SOURCE_DIR}/ui"
   "${PROJECT_SOURCE_DIR}/vendor"
   "${PROJECT_SOURCE_DIR}/video-player"
   "${PROJECT_SOURCE_DIR}/libs/glfw/include/"
@@ -28,21 +28,25 @@ include_directories(
   ${GLFW_INCLUDE_DIRS})
 
 set( source_files
-  src/main.cpp
-  src/imgui_demo.cpp
-  src/imgui_draw.cpp
-  src/imgui_impl_glfw_gl3.cpp
-  src/imgui.cpp )
+  ui/main.cpp
+  ui/imgui_demo.cpp
+  ui/imgui_draw.cpp
+  ui/imgui_impl_glfw_gl3.cpp
+  ui/imgui.cpp )
 
 LINK_DIRECTORIES(${GLFW_LIBRARY_DIR})
 
-# add_subdirectory( "${PROJECT_SOURCE_DIR}/video-player" )
+add_subdirectory( "${PROJECT_SOURCE_DIR}/vendor/VLFeat" )
+add_subdirectory( "${PROJECT_SOURCE_DIR}/feature" )
+add_subdirectory( "${PROJECT_SOURCE_DIR}/vendor/mser" )
 
 add_executable( app ${source_files})
 
 target_link_libraries( app
-  # videoPlayer
+  vlfeat
+  feature
   pthread
+  mser
   ${FFMPEG_LIBAVCODEC}
   ${FFMPEG_LIBAVFORMAT}
   ${AVFORMAT_LIBRARIES}
@@ -54,9 +58,9 @@ target_link_libraries( app
   ${GLFW_LIBRARIES}
   ${GLUT_LIBRARY}
   ${OPENGL_LIBRARY}
- ${CMAKE_THREAD_LIBS_INIT}
- ${FFMPEG_LIBRARIES}
- ${SDL2_LIBRARIES}
- ${CMAKE_DL_LIBS}
+  ${CMAKE_THREAD_LIBS_INIT}
+  ${FFMPEG_LIBRARIES}
+  ${SDL2_LIBRARIES}
+  ${CMAKE_DL_LIBS}
 
 )

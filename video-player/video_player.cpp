@@ -1,5 +1,6 @@
 // #include "video_player.h"
 
+
 // static members
 template<class T>
 std::set<std::string> GL3VideoPlayer<T>::open_urls = {};
@@ -17,6 +18,106 @@ int GL3VideoPlayer::CloseStream()
 
    TODO: cover the situation where this function is called while a video is being played
 */
+template<class Renderer>
+GL3VideoPlayer<Renderer>::GL3VideoPlayer(size_t w, size_t h,  GLFWwindow* window)
+:  Renderer(w,h) , format_ctx{nullptr} ,
+   codec_ctx{nullptr} ,
+   _stream_open{false} ,
+   video_stream_index{-1} ,
+   picture{nullptr} , picture_buffer{nullptr} ,
+   stream{nullptr} , output_ctx{nullptr} ,
+   codec{nullptr} , output_width{640} ,
+   output_height{480}, output_channels{1},
+   mser_ctx{w,h,1}
+{
+  status = "Initialzing...";
+
+  if (! _init )
+  {
+    av_register_all();
+    avformat_network_init();
+    // av_log_set_level( AV_LOG_DEBUG );
+
+    format_ctx = avformat_alloc_context();
+    output_ctx = avformat_alloc_context();
+    if (format_ctx == nullptr || output_ctx == nullptr)
+    {
+      std::cout << "FFMpegStreamer: avformat_alloc_context failed" << std::endl;
+      return;
+    }
+
+    codec = avcodec_find_decoder(AV_CODEC_ID_MJPEG);
+    if (codec == nullptr)
+    {
+        std::cout << "FFMpegStreamer: could not find codec" << std::endl;
+        return;
+    }
+
+    codec_ctx = avcodec_alloc_context3(codec);
+    if (codec_ctx == nullptr)
+    {
+        std::cout << "FFMpegStreamer: could not allocate codec_ctx" << std::endl;
+        return;
+    }
+
+    if (avcodec_open2(codec_ctx, codec, nullptr) < 0)
+    {
+      std::cout << "avcodec_open2 failed" << std::endl;
+      return;
+    }
+
+    av_init_packet(&packet);
+
+    format_ctx = avformat_alloc_context();
+    if (format_ctx == nullptr )
+    {
+      std::cout << "avformat_alloc_context failed" << std::endl;
+      return;
+    }
+
+    picture = av_frame_alloc();
+    _rgb_frame = av_frame_alloc();
+    if (picture == nullptr || _rgb_frame == nullptr)
+    {
+      std::cout << "av_frame_alloc failed" << std::endl;
+      return;
+    }
+
+    _init = true;
+    status = "Initialized.";
+  }
+}
+
+template<class Renderer>
+GL3VideoPlayer<Renderer>::~GL3VideoPlayer()
+{
+  if (StreamIsOpen())
+  {
+    av_read_pause(format_ctx);
+    avio_close(output_ctx->pb);
+  }
+
+  if ( _init )
+  {
+    avformat_network_deinit();
+  }
+
+  if (codec_ctx != nullptr)
+  {
+    avcodec_close( codec_ctx );
+    avcodec_free_context( &codec_ctx);
+    av_freep( &codec_ctx);
+  }
+
+  if (picture != nullptr) av_frame_unref(picture);
+  av_freep(&picture);
+  if (_rgb_frame != nullptr) av_frame_unref(_rgb_frame);
+  av_freep(&_rgb_frame);
+  if (picture_buffer != nullptr) av_free(picture_buffer);
+  if (output_ctx != nullptr) avformat_free_context(output_ctx);
+  if (format_ctx != nullptr) avformat_free_context(format_ctx);
+}
+
 template<class Renderer>
 int GL3VideoPlayer<Renderer>::i_OpenStream(std::string url)
 {
@@ -75,15 +176,17 @@ int GL3VideoPlayer<Renderer>::i_OpenStream(std::string url)
     return -1;
   }
 
+// TODO: fix this so it will set the output channels correctly
   img_convert_ctx = sws_getContext(
     codec_ctx->width,
     codec_ctx->height,
     codec_ctx->pix_fmt,
-    codec_ctx->width,
-    codec_ctx->height,
+    output_width,
+    output_height,
     AV_PIX_FMT_GRAY8,
     SWS_BICUBIC,
     nullptr, nullptr, nullptr);
+
 
   //TODO: avpicture_get_size is deprecated
   int picture_size = avpicture_get_size(
@@ -141,6 +244,8 @@ int GL3VideoPlayer<Renderer>::i_OpenStream(std::string url)
   return 1;
 }
 
+// get an AVFrame from the queue and send it to the renderer
+//
 template<class Renderer>
 int GL3VideoPlayer<Renderer>::i_RenderFrame(TimeSegment* tf)
 {
@@ -149,9 +254,24 @@ int GL3VideoPlayer<Renderer>::i_RenderFrame(TimeSegment* tf)
   static size_t frame_count = 0;
 
   AVFrame _next_frame;
-  if ( _rgb_frame_q.size_approx() > 1) return val;
-  if (_rgb_frame_q.try_dequeue(_next_frame))
+
+  if ( _rgb_frame_q.size_approx() < 1) return val;
+  bool result = _rgb_frame_q.try_dequeue(_next_frame);
+  if ( result )
   {
+    if ((frame_count % 50 ) == 0 )
+    {
+    MSER mser4(2, 0.0005, 0.1, 0.5, 0.5, false);
+    std::vector<MSER::Region> regions;
+    mser4(_next_frame.data[0], output_width, output_height, regions);
+    std::cout << "Extracted " << regions.size() << std::endl;
+
+    //TODO: this seg faults. try it without do_mser_cpu.
+    //   VlMserReg* regions = new VlMserReg;
+    //   do_mser_cpu(mser_ctx, _next_frame, regions);
+    //   std::cout << vl_mser_get_stats(mser_ctx.MserFilt)->num_extremal << std::endl;
+    //   delete regions;
+    }
     if (frame_count == 0) Renderer::RenderFrame_0(&_next_frame);
     else Renderer::RenderFrame_1(&_next_frame);
     frame_count++;
