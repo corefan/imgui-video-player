@@ -1,6 +1,8 @@
 #ifndef _VIDEO_PLAYER_H_
 #define _VIDEO_PLAYER_H_
 
+#include <algorithm>
+#include <cmath>
 #include <future>
 #include <thread>
 #include <iostream>
@@ -55,8 +57,9 @@ bool do_mser_cpu(
 class GL3FrameRenderer_Texture2D
 {
 public:
-  void RenderFrame_0(AVFrame* frame);
-  void RenderFrame_1(AVFrame* frame);
+  void RenderFrame_0_red(AVFrame* frame);
+  void RenderFrame_1_red(AVFrame* frame);
+  void RenderFrame_2_red(uint8_t* frame);
 
   GL3FrameRenderer_Texture2D(const size_t w, const size_t h)
   : width{w}, height{h}
@@ -66,6 +69,14 @@ public:
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width,height,0,GL_RED,GL_UNSIGNED_BYTE, nullptr);
+
+    glGenTextures(1, &mers_tex);
+    glBindTexture(GL_TEXTURE_2D, mers_tex);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width,height,0,GL_RED,GL_UNSIGNED_BYTE, nullptr);
   }
 
 private:
@@ -73,7 +84,7 @@ private:
   size_t height;
 protected:
   GLuint tex;
-
+  GLuint mers_tex;
 };
 
 // TODO: don't use inheritance like this
@@ -116,6 +127,7 @@ public:
   bool IsInited() { return _init; }
   bool StreamIsOpen() { return _stream_open; }
   GLuint GetTextureId() { return Renderer::tex; }
+  GLuint GetTextureId_mers() { return Renderer::mers_tex; }
   const char* GetStatusString() { return status.c_str(); }
   AVFormatContext* format_ctx;
 
@@ -139,7 +151,7 @@ private:
   size_t output_height;
   size_t output_channels;
   mser_cpu_context mser_ctx;
-
+  std::vector<uint8_t>_mers_image;
 };
 
 #include "video_player.cpp"

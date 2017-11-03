@@ -144,6 +144,15 @@ int main(int, char**)
           ImGui::End();
         }
 
+        if (show_video_window)
+        {
+          GLuint video_tex = video1.GetTextureId_mers();
+          ImGui::Begin("MERS", &show_video_window);
+          ImGui::Text(video1.GetStatusString());
+          ImGui::Image((void *)video_tex, ImVec2(640, 480), ImVec2(0,0), ImVec2(1,1), ImColor(255,255,255,255), ImColor(255,255,255,128));
+          ImGui::End();
+        }
+
         // 3. Show the ImGui test gl_window_ctx. Most of the sample code is in ImGui::ShowTestWindow()
         if (show_test_window)
         {
