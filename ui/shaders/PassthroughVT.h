@@ -16,12 +16,12 @@ const std::string PassThroughShaderCode =
 "}\n";
 
 const std::string SimpleVertexShaderCode =
-"#version 150\n"
-"\n" 
-" in vec4 position;\n"
-"\n" 
+"#version 330 core\n"
+"layout (location=0) in vec3 position;\n"
+"\n"
+"uniform mat4 transform;\n"
 " void main() {\n"
-" 	gl_Position = position;\n"
+" 	gl_Position = transform * vec4(position, 1.0);\n"
 "}\n";
 
 

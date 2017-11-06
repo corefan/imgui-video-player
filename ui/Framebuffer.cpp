@@ -1,14 +1,51 @@
 #include "Framebuffer.h"
 #include <iostream>
+#include <math.h>
 
 #include "gl_state.h"
 
 #include "shaders/PassthroughVT.h"
 #include "shaders/FragmentShadingRTT.h"
 
-Framebuffer::Framebuffer(size_t w, size_t h)
-: _w{w} , _h{h}
+void Framebuffer::setViewMatrix()
 {
+	Eigen::Matrix4f A;
+	Eigen::Matrix4f B = Eigen::Matrix4f::Identity();
+	A.row(0) << _cameraRight(0), _cameraRight(1), _cameraRight(2) , 0.0f;
+	A.row(1) << _cameraUp(0), _cameraUp(1), _cameraUp(2) , 0.0f;
+	A.row(2) << _cameraDirection(0), _cameraDirection(1), _cameraDirection(2), 0.0f;
+	A.row(3) << 0.0f, 0.0f, 0.0f, 1.0f;
+	B.col(3) << -1*_camera(0), -1*_camera(1), -1*_camera(2) , 1.0f;
+	_view = A*B;
+}
+
+void Framebuffer::setProjectionMatrix()
+{
+	float tha = 1.0/tan(M_PI * (_fov/360.0f));
+	float rat = static_cast<float>(_w) / static_cast<float>(_h);
+	_projection.row(0) << tha , 0.0f, 0.0f , 0.0f;
+	_projection.row(1) << 0.0f , tha/rat , 0.0f, 0.0f;
+	_projection.row(2) << 0.0f, 0.0f , -1.0f*(_near + _far)/(_far - _near), -2.0f * _far * _near / ( _far - _near );
+	_projection.row(3) << 0.0f, 0.0f, -1.0f, 0.0f;
+}
+
+void Framebuffer::setTransformMatrix()
+{
+	_transform =  _projection;
+}
+
+Framebuffer::Framebuffer(size_t w, size_t h)
+: _w{w} , _h{h}, _camera{0.0f, 0.0f, 2.0f}, _cameraTarget{0.0f, 0.0f, 0.0f},
+	_up{0.0f,1.0f,0.0f}, _near{0.0001f}, _far{100.0f}, _fov{160.0f}
+{
+	_cameraDirection = (_camera - _cameraTarget).normalized();
+	_cameraRight = _up.cross(_cameraDirection);
+	_cameraUp = _cameraDirection.cross(_cameraRight);
+	setViewMatrix();
+	setProjectionMatrix();
+	setTransformMatrix();
+
+	_vertices = Eigen::VectorXf::Random(3000);
 	gl_state glState;
 	glState.backup();
 
@@ -31,7 +68,7 @@ Framebuffer::Framebuffer(size_t w, size_t h)
 // set width, height, color depth
 	glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, _w);
 	glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, _h);
-	glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_SAMPLES, 4);
+	glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_SAMPLES, 3);
 
 	glGenRenderbuffers(1, &_framebuffer);
 	glBindRenderbuffer(GL_RENDERBUFFER, _framebuffer);
@@ -47,7 +84,7 @@ Framebuffer::Framebuffer(size_t w, size_t h)
 				0, GL_RGBA, GL_UNSIGNED_BYTE,
 				nullptr);
 
-	glFramebufferTexture2D(_framebuffer_id,GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,_colorTex, 0);
+	glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D, _colorTex, 0);
 
 	GLenum e = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
 	if (e != GL_FRAMEBUFFER_COMPLETE)
@@ -64,19 +101,50 @@ Framebuffer::Framebuffer(size_t w, size_t h)
 
 // shaders
 	_shaderProgram = LoadShaders(SimpleVertexShaderCode, SimpleFragmentShaderCode);
+	GLenum ErrorCheckValue = glGetError();
 
+	_shaderTransform = glGetUniformLocation(_shaderProgram, "transform");
+
+// done
+
+  if (ErrorCheckValue != GL_NO_ERROR)
+  	std::cout << "ERROR: Could not create a VBO " << gluErrorString(ErrorCheckValue) << std::endl;
+ 
 	glState.restore();
 }
 
 void Framebuffer::Render()
 {
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _framebuffer_id);
-	glDrawBuffers(1, _renderTargets);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glUseProgram(_shaderProgram);
+	GLenum ErrorCheckValue = glGetError();
 
-	glBindVertexArray(_vertices_id);
-	glDrawArrays(GL_POINTS, 0, 12);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _framebuffer);
+
+	glClearColor(0.1f, 0.1f, 0.3f, 1.0f);
+	glPointSize(4.0);
+	GLuint attachments[1] = { GL_COLOR_ATTACHMENT0 };
+	glDrawBuffers(1,  attachments);
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glViewport(0,0,_w,_h);
+
+	glUseProgram(_shaderProgram);
+	glUniformMatrix4fv(_shaderTransform, 1, GL_FALSE, _transform.data());
+
+	glEnableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, _vertices_buf);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*_vertices.size(), _vertices.data(), GL_STATIC_DRAW);
+			ErrorCheckValue = glGetError();
+
+	glBindVertexArray(_vertices_buf);
+	glDrawArrays(GL_POINTS, 0, _vertices.size()/3 );
+
+  if (ErrorCheckValue != GL_NO_ERROR)
+  	std::cout << "Render ERROR:  " << gluErrorString(ErrorCheckValue) << std::endl;
+
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
 }
 

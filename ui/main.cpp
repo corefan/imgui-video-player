@@ -10,9 +10,6 @@
 #include "video_player.hpp"
 #define DEFAULT_URL "http://192.168.43.1:8080/video"
 
-#include "ImGuiDock.h"
-using namespace ImGuiDock;
-
 #include "Framebuffer.h"
 
 #define IM_ARRAYSIZE(_ARR)  ((int)(sizeof(_ARR)/sizeof(*_ARR)))
@@ -85,7 +82,7 @@ int main(int, char**)
     // Main loop
 
     Framebuffer test_framebuffer(640,480);
-    
+
     std::cout << "here we are" << std::endl;
     while (!glfwWindowShouldClose(gl_window_ctx))
     {
@@ -160,10 +157,15 @@ int main(int, char**)
         if (show_video_window)
         {
 
+
+
           // GLuint video_tex  = video1.GetTextureId_mers();
           ImGui::Begin("MSER", &show_video_window);
+
+          test_framebuffer.Render();
           // ImGui::Text(video1.GetStatusString());
-          // ImGui::Image((void *)video_tex, ImVec2(640, 480), ImVec2(0,0), ImVec2(1,1), ImColor(255,255,255,255), ImColor(255,255,255,128));
+          ImGui::Image((void *)test_framebuffer.getTexture(), ImVec2(640, 480), ImVec2(0,0), ImVec2(1,1), ImColor(255,255,255,255), ImColor(255,255,255,128));
+
           ImGui::End();
         }
 

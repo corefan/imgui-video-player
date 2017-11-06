@@ -58,6 +58,7 @@ target_link_libraries( app
   feature
   pthread
   mser
+  Eigen3::Eigen
   ${FFMPEG_LIBAVCODEC}
   ${FFMPEG_LIBAVFORMAT}
   ${AVFORMAT_LIBRARIES}
