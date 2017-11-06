@@ -10,6 +10,11 @@
 #include "video_player.hpp"
 #define DEFAULT_URL "http://192.168.43.1:8080/video"
 
+#include "ImGuiDock.h"
+using namespace ImGuiDock;
+
+#include "Framebuffer.h"
+
 #define IM_ARRAYSIZE(_ARR)  ((int)(sizeof(_ARR)/sizeof(*_ARR)))
 
 const std::string video_url{DEFAULT_URL};
@@ -26,6 +31,7 @@ int main(int, char**)
     TimeSegment timer_render_frame;
     TimeSegment timer_main_loop;
 
+
     // Setup window
     glfwSetErrorCallback(error_callback);
     if (!glfwInit()) return 1;
@@ -35,6 +41,7 @@ int main(int, char**)
 #if __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
+
     GLFWwindow* gl_window_ctx = glfwCreateWindow(1280, 720, "ImGui OpenGL3 example", NULL, NULL);
     glfwMakeContextCurrent(gl_window_ctx);
     glfwSwapInterval(1); // Enable vsync
@@ -44,6 +51,9 @@ int main(int, char**)
     }
     // Setup ImGui binding
     ImGui_ImplGlfwGL3_Init(gl_window_ctx, true);
+
+    // triangle_test test_triangle;
+
 
     // Load Fonts
     // (there is a default font, this is only if you want to change it. see extra_fonts/README.txt for more details)
@@ -55,12 +65,12 @@ int main(int, char**)
     //io.Fonts->AddFontFromFileTTF("../../extra_fonts/ProggyTiny.ttf", 10.0f);
     //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
 
-    bool show_test_window = false;
+    bool show_test_window = true;
     bool show_video_window = true;
     bool main_window_closable = false;
     std::string show_video_msg = "Show Video";
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
+    ImVec2 workAreaSize = ImVec2(400,400);
     GLuint tex;
     glGenTextures(1, &tex);
 
@@ -72,10 +82,14 @@ int main(int, char**)
 
     // std::future<int> open_video_2;
     // open_video_2 = video2.t_OpenStream(video_url);
-
     // Main loop
+
+    Framebuffer test_framebuffer(640,480);
+    
+    std::cout << "here we are" << std::endl;
     while (!glfwWindowShouldClose(gl_window_ctx))
     {
+
       long read_frame_start;
       long read_frame_stop;
       long render_frame_start;
@@ -129,7 +143,6 @@ int main(int, char**)
           ImGui::InputText("Url", buf, IM_ARRAYSIZE(buf));
           // ImGui::ProgressBar(rf1, ImVec2(0.f,0.f), "read", rf0);
           // ImGui::ProgressBar(df1, ImVec2(0.f,0.f), "render", df0);
-
           ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
           ImGui::End();
         }
@@ -146,10 +159,11 @@ int main(int, char**)
 
         if (show_video_window)
         {
-          GLuint video_tex = video1.GetTextureId_mers();
-          ImGui::Begin("MERS", &show_video_window);
-          ImGui::Text(video1.GetStatusString());
-          ImGui::Image((void *)video_tex, ImVec2(640, 480), ImVec2(0,0), ImVec2(1,1), ImColor(255,255,255,255), ImColor(255,255,255,128));
+
+          // GLuint video_tex  = video1.GetTextureId_mers();
+          ImGui::Begin("MSER", &show_video_window);
+          // ImGui::Text(video1.GetStatusString());
+          // ImGui::Image((void *)video_tex, ImVec2(640, 480), ImVec2(0,0), ImVec2(1,1), ImColor(255,255,255,255), ImColor(255,255,255,128));
           ImGui::End();
         }
 
@@ -168,6 +182,7 @@ int main(int, char**)
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui::Render();
         glfwSwapBuffers(gl_window_ctx);
+        // test_triangle.Render();
 
     }
 
