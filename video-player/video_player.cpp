@@ -1,64 +1,6 @@
-// #include "video_player.h"
 
 #define OUTPUT_FORMAT AV_PIX_FMT_GRAY8
 
-void drawEllipse(const MSER::Region & region, const size_t width, const size_t height, const size_t depth,
-				 std::vector<uint8_t> & bits, const uint8_t * color)
-{
-	size_t _depth = depth < 4 ? depth : 1;
-	if (region.area_ > 250) return;
-	// Centroid (mean)
-	const double x = region.moments_[0] / region.area_;
-	const double y = region.moments_[1] / region.area_;
-
-	// Covariance matrix [a b; b c]
-	const double a = region.moments_[2] / region.area_ - x * x;
-	const double b = region.moments_[3] / region.area_ - x * y;
-	const double c = region.moments_[4] / region.area_ - y * y;
-
-	// Eigenvalues of the covariance matrix
-	const double d  = a + c;
-	const double e  = a - c;
-	const double f  = sqrt(4.0 * b * b + e * e);
-	const double e0 = (d + f) / 2.0; // First eigenvalue
-	const double e1 = (d - f) / 2.0; // Second eigenvalue
-
-	// Desired norm of the eigenvectors
-	const double e0sq = sqrt(e0);
-	const double e1sq = sqrt(e1);
-
-	// Eigenvectors
-	double v0x = e0sq;
-	double v0y = 0.0;
-	double v1x = 0.0;
-	double v1y = e1sq;
-
-	if (b) {
-		v0x = e0 - c;
-		v0y = b;
-		v1x = e1 - c;
-		v1y = b;
-
-		// Normalize the eigenvectors
-		const double n0 = e0sq / sqrt(v0x * v0x + v0y * v0y);
-		v0x *= n0;
-		v0y *= n0;
-
-		const double n1 = e1sq / sqrt(v1x * v1x + v1y * v1y);
-		v1x *= n1;
-		v1y *= n1;
-	}
-
-
-	for (double t = 0.0; t < 2.0 * M_PI; t += 0.001) {
-		int x2 = x + (cos(t) * v0x + sin(t) * v1x) * 2.0 + 0.5;
-		int y2 = y + (cos(t) * v0y + sin(t) * v1y) * 2.0 + 0.5;
-
-		if ((x2 >= 0) && (x2 < width) && (y2 >= 0) && (y2 < height))
-			for (int i = 0; i < _depth; ++i)
-				bits[(y2 * width + x2) * depth + i] = color[i];
-	}
-}
 
 // static members
 template<class T>
@@ -87,7 +29,7 @@ GL3VideoPlayer<Renderer>::GL3VideoPlayer(size_t w, size_t h,  GLFWwindow* window
    stream{nullptr} , output_ctx{nullptr} ,
    codec{nullptr} , output_width{640} ,
    output_height{480}, output_channels{1},
-   mser_ctx{w,h,1} , _mers_image(w*h)
+   test_framebuffer{640,480}
 {
   status = "Initialzing...";
 
@@ -315,8 +257,9 @@ int GL3VideoPlayer<Renderer>::i_RenderFrame(TimeSegment* tf)
   static size_t frame_count = 0;
 
   AVFrame _next_frame;
-  MSER mser4(2, 0.0005, 0.1, 0.5, 0.5, false);
-  std::vector<MSER::Region> regions;
+ 
+  mser_cpu_extractor mser1;
+  Eigen::VectorXf region_centers;
 
   if ( _rgb_frame_q.size_approx() < 1) return val;
   bool result = _rgb_frame_q.try_dequeue(_next_frame);
@@ -324,24 +267,17 @@ int GL3VideoPlayer<Renderer>::i_RenderFrame(TimeSegment* tf)
   {
     if ((frame_count % 10 ) == 0 )
     {
-			regions.clear();
-	    mser4(_next_frame.data[0], output_width, output_height, regions);
-	    std::cout << "Extracted " << regions.size() << std::endl;
-			const uint8_t color = 255;
-			for(size_t i = 0; i < _mers_image.size() ; i++) _mers_image[i] = 0;
+      size_t ncenters = mser1.Run(_next_frame.data[0], output_width, output_height);
+      if (ncenters)
+      {
+        mser1.RegionsFirstMomentsToXYZ(region_centers);
+        test_framebuffer.SetVertices(&region_centers);
+        test_framebuffer.Render();
+        std::cout << "video_player found " << ncenters << "MSER regions" << std::endl;
 
-			for (size_t i = 0; i < regions.size(); i++)
-				drawEllipse(regions[i], output_width, output_height, output_channels, _mers_image, &color );
-			Renderer::RenderFrame_2_red(_mers_image.data());
-
-	    //TODO: this seg faults. try it without do_mser_cpu.
-	    //   VlMserReg* regions = new VlMserReg;
-	    //   do_mser_cpu(mser_ctx, _next_frame, regions);
-	    //   std::cout << vl_mser_get_stats(mser_ctx.MserFilt)->num_extremal << std::endl;
-	    //   delete regions;
-    }
-    // if (frame_count == 0) Renderer::RenderFrame_0_red(&_next_frame);
-    // else Renderer::RenderFrame_1_red(&_next_frame);
+      }
+	  }
+ 
 		Renderer::RenderFrame_1_red(&_next_frame);
 
     frame_count++;
@@ -389,6 +325,8 @@ int GL3VideoPlayer<Renderer>::i_ReadFrame(TimeSegment* tf)
   return frame_count;
 }
 
+
+
 void GL3FrameRenderer_Texture2D::RenderFrame_1_red(AVFrame* frame)
 {
   glActiveTexture(tex);
@@ -409,3 +347,4 @@ void GL3FrameRenderer_Texture2D::RenderFrame_0_red(AVFrame* frame)
   glBindTexture(GL_TEXTURE_2D, tex);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width,height,0,GL_RED,GL_UNSIGNED_BYTE, frame->data[0]);
 }
+

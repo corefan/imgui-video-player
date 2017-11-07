@@ -37,27 +37,25 @@ set( source_files
   ui/imgui_impl_glfw_gl3.cpp
   ui/imgui_impl_glfw_gl3_01.cpp
   ui/imgui.cpp
-  ui/testgl.cpp
   ui/gl_state.cpp
-  ui/Framebuffer.cpp)
+)
 
 configure_file(ui/suzanne.obj suzanne.obj)
 configure_file(ui/uvmap.DDS uvmap.DDS)
 
 LINK_DIRECTORIES(${GLFW_LIBRARY_DIR})
 
-add_subdirectory( "${PROJECT_SOURCE_DIR}/vendor/VLFeat" )
-add_subdirectory( "${PROJECT_SOURCE_DIR}/feature" )
 add_subdirectory( "${PROJECT_SOURCE_DIR}/vendor/mser" )
-# add_subdirectory( "${PROJECT_SOURCE_DIR}/vendor/glm-0.9.7.1" )
+add_subdirectory( "${PROJECT_SOURCE_DIR}/feature" )
+add_subdirectory( "${PROJECT_SOURCE_DIR}/renderers" )
 
 add_executable( app ${source_files})
 
 target_link_libraries( app
-  vlfeat
   feature
   pthread
   mser
+  renderers
   Eigen3::Eigen
   ${FFMPEG_LIBAVCODEC}
   ${FFMPEG_LIBAVFORMAT}

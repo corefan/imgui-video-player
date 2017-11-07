@@ -15,8 +15,9 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
 #include <libswscale/swscale.h>
-#include "feature/mser.h"
 }
+
+#include "feature/mser_cpu_extractor.h"
 
 // GL frame renderer
 #include <GL/glew.h>
@@ -25,7 +26,10 @@ extern "C" {
 #include "readerwriterqueue/atomicops.h"
 #include "readerwriterqueue/readerwriterqueue.h"
 
-#include "mser/mser.h"
+#include <Eigen/Core>
+
+#include "renderers/Framebuffer.h"
+
 using namespace moodycamel;
 using Clock = std::chrono::steady_clock;
 using Interval = std::chrono::nanoseconds;
@@ -41,18 +45,6 @@ struct TimeSegment
   size_t Duration() { return std::chrono::duration_cast<Interval>(t1 - t0).count(); }
   TimeSegment() { t0 = Clock::now(); t1 = t0; }
 };
-
-bool do_mser_cpu(
-  mser_cpu_context& ctx,
-  const AVFrame& frame,
-  VlMserReg* regions )
-{
-  vl_mser_process(
-    ctx.MserFilt,
-    (vl_mser_pix const*)frame.data[0] );
-
-  return true;
-}
 
 class GL3FrameRenderer_Texture2D
 {
@@ -127,6 +119,7 @@ public:
   bool IsInited() { return _init; }
   bool StreamIsOpen() { return _stream_open; }
   GLuint GetTextureId() { return Renderer::tex; }
+  GLuint GetTextureId2() { return test_framebuffer.getTexture(); }
   GLuint GetTextureId_mers() { return Renderer::mers_tex; }
   const char* GetStatusString() { return status.c_str(); }
   AVFormatContext* format_ctx;
@@ -150,10 +143,10 @@ private:
   size_t output_width;
   size_t output_height;
   size_t output_channels;
-  mser_cpu_context mser_ctx;
-  std::vector<uint8_t>_mers_image;
+  Framebuffer test_framebuffer;
+
 };
 
-#include "video_player.cpp"
-
 #endif // _VIDEO_PLAYER_H_
+
+#include "video_player.cpp"
