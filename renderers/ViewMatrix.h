@@ -3,12 +3,13 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
 
 using vec3f = Eigen::Matrix<float,3,1>;
 using vec4f = Eigen::Matrix<float,4,1>;
 using mat4f = Eigen::Matrix4f;
-using Map3f = Eigen::Map<const vec3f>;
 
 class TransformationMatrix 
 {
@@ -19,6 +20,8 @@ public:
 	}
 	void LookAt_rh(const vec3f& eye, const vec3f& target, const vec3f& up);
 	void LookAt_rh_fast(const vec3f& e, const vec3f& t, const  vec3f& u);
+	const GLfloat* data() { return (const GLfloat *)_transform.data(); }
+
 	// void LookAt_rh_fast();
 
 

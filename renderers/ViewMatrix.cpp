@@ -1,6 +1,8 @@
 #include "ViewMatrix.h"
 #include <iostream>
 
+using Map3f = Eigen::Map<const vec3f>;
+
 void TransformationMatrix::LookAt_rh(const vec3f& e, const  vec3f& t, const vec3f& u)
 {
 	vec3f zaxis = (e - t).normalized();
@@ -17,8 +19,8 @@ void TransformationMatrix::LookAt_rh(const vec3f& e, const  vec3f& t, const vec3
 void TransformationMatrix::LookAt_rh_fast(const vec3f& e, const vec3f& t, const vec3f& u)
 {
 	/* This uses Eigen's Map to do math in place, thereby avoiding time consuming copies !
-		TODO: test if it actually works? Also it's damn ugly. maybe clean it up with a macro?
-		here's an idea! use "using"... should work because inheritance!
+		TODO: test if it actually is better
+	 ? Also it's damn ugly. 
 	*/
 	_transform.block<3,1>(0,2) << (e - t).normalized();
 	_transform.block<1,1>(3,2) << -Map3f(_transform.col(2).data(),3).dot(e); // zaxis
